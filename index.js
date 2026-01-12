@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { api } from "./api.js";
 import { SearchServicesSchema, ExplainDiscountSchema } from "./schemas.js";
-
+import express from "express";
 const server = new McpServer({
   name: "harito-services-mcp",
   version: "1.0.0",
@@ -101,6 +101,22 @@ No manual coupon entry is required.
   }
 );
 // const transport = new StdioServerTransport(); for local testing
-const transport = new StreamableHTTPServerTransport();
-server.connect(transport);
-console.log("Harito MCP server is running...");
+// server.connect(transport);
+
+app.post("/mcp", async (req, res) => {
+  // Create a new transport for every incoming request
+  const transport = new StreamableHTTPServerTransport();
+  // Note: For Streamable HTTP, we don't use server.connect(transport) globally.
+  // We connect it specifically for this request lifecycle.
+  await server.connect(transport);
+  // Hand off the Express request/response to the MCP transport
+  // The transport will handle reading the body and writing the response
+  await transport.handlePostMessage(req, res);
+});
+
+// 4. Start Listening
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Harito MCP server is running on port ${PORT}`);
+  console.log(`MCP Endpoint: http://localhost:${PORT}/mcp`);
+});
