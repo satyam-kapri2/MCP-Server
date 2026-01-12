@@ -1,8 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { api } from "./api.js";
-import { SearchServicesSchema, ExplainDiscountSchema } from "./schemas.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { api } from "./api.js";
+import express from "express";
+import { SearchServicesSchema, ExplainDiscountSchema } from "./schemas.js";
+
+const app = express();
+
+// 1. Required: Middleware to parse JSON bodies
+app.use(express.json());
+
 const server = new McpServer({
   name: "harito-services-mcp",
   version: "1.0.0",
@@ -105,6 +111,28 @@ No manual coupon entry is required.
   }
 );
 
-// const transport = new StdioServerTransport();
-const transport = new StreamableHTTPServerTransport();
-server.connect(transport);
+// 2. Modern "Streamable HTTP" Route
+// This single route handles both the SSE stream (GET) and messages (POST)
+app.all("/mcp", async (req, res) => {
+  // Create a new transport for this request
+  const transport = new StreamableHTTPServerTransport();
+
+  await server.connect(transport);
+
+  // Handle the request (this processes both GET handshakes and POST messages)
+  // Note: We pass req.body explicitly for the POST case
+  await transport.handleRequest(req, res, req.body);
+
+  // Clean up when the connection closes
+  req.on("close", async () => {
+    await transport.close();
+    // server.close() is not called here because the server instance is shared
+  });
+});
+
+// 3. Start Listening
+
+app.listen(3000, "0.0.0.0", () => {
+  console.log(`Harito MCP server running on port 3000`);
+  console.log(`MCP Endpoint: http://localhost:3000/mcp`);
+});
