@@ -26,8 +26,7 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # START COMMAND:
-# If using TypeScript (built to 'dist'):
-CMD ["node", "dist/index.js"]
+CMD ["npm", "start"]
 
 # If using raw JavaScript (no build):
 # CMD ["node", "index.js"]
