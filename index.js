@@ -1,79 +1,87 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+// import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"; for local testing
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { api } from "./api.js";
 import { SearchServicesSchema, ExplainDiscountSchema } from "./schemas.js";
+
 const server = new McpServer({
-    name: "harito-services-mcp",
-    version: "1.0.0",
+  name: "harito-services-mcp",
+  version: "1.0.0",
 });
-server.registerTool("search_services", {
+server.registerTool(
+  "search_services",
+  {
     title: "Search Harito Services",
-    description: "Search Harito services with pricing. Discounts are not included.",
+    description:
+      "Search Harito services with pricing. Discounts are not included.",
     inputSchema: SearchServicesSchema,
-}, async ({ q, page = 1, limit = 20 }) => {
+  },
+  async ({ q, page = 1, limit = 20 }) => {
     try {
-        const response = await api.get("/service/search-full", {
-            params: { q, page, limit },
-        });
-        const sanitized = {
-            ...response.data,
-            data: response.data.data.map((service) => ({
-                ...service,
-                packages: service.packages.map((pkg) => ({
-                    id: pkg.id,
-                    name: pkg.name,
-                    price: pkg.price,
-                    type: pkg.type,
-                    durationSlots: pkg.durationSlots,
-                    hasPotentialDiscounts: true,
-                })),
-            })),
-        };
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: JSON.stringify(sanitized, null, 2),
-                },
-            ],
-        };
+      const response = await api.get("/service/search-full", {
+        params: { q, page, limit },
+      });
+      const sanitized = {
+        ...response.data,
+        data: response.data.data.map((service) => ({
+          ...service,
+          packages: service.packages.map((pkg) => ({
+            id: pkg.id,
+            name: pkg.name,
+            price: pkg.price,
+            type: pkg.type,
+            durationSlots: pkg.durationSlots,
+            hasPotentialDiscounts: true,
+          })),
+        })),
+      };
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(sanitized, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: err.response?.data?.error || "Failed to search services",
+          },
+        ],
+      };
     }
-    catch (err) {
-        return {
-            isError: true,
-            content: [
-                {
-                    type: "text",
-                    text: err.response?.data?.error || "Failed to search services",
-                },
-            ],
-        };
-    }
-});
-server.registerTool("explain_service_discounts", {
+  }
+);
+server.registerTool(
+  "explain_service_discounts",
+  {
     title: "Explain Service Discounts",
     description: "Explain how discounts may be applied for a service",
     inputSchema: ExplainDiscountSchema,
-}, async ({ service_id }) => {
+  },
+  async ({ service_id }) => {
     try {
-        await api.get(`/service/${service_id}`);
-    }
-    catch {
-        return {
-            isError: true,
-            content: [
-                {
-                    type: "text",
-                    text: "Invalid service ID",
-                },
-            ],
-        };
+      await api.get(`/service/${service_id}`);
+    } catch {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: "Invalid service ID",
+          },
+        ],
+      };
     }
     return {
-        content: [
-            {
-                type: "text",
-                text: `
+      content: [
+        {
+          type: "text",
+          text: `
 Harito may offer promotional discounts for this service.
 
 Discounts are usually applied when:
@@ -87,9 +95,12 @@ To avail any eligible discount:
 
 No manual coupon entry is required.
 `,
-            },
-        ],
+        },
+      ],
     };
-});
-const transport = new StdioServerTransport();
+  }
+);
+// const transport = new StdioServerTransport(); for local testing
+const transport = new StreamableHTTPServerTransport();
 server.connect(transport);
+console.log("Harito MCP server is running...");
