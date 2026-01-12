@@ -114,20 +114,39 @@ No manual coupon entry is required.
 // 2. Modern "Streamable HTTP" Route
 // This single route handles both the SSE stream (GET) and messages (POST)
 app.all("/mcp", async (req, res) => {
-  // Create a new transport for this request
   const transport = new StreamableHTTPServerTransport();
 
-  await server.connect(transport);
+  // Create a safe cleanup function
+  // We use a flag to prevent double-closing which causes "terminated" errors
+  let isClosed = false;
+  const safeClose = async () => {
+    if (isClosed) return;
+    isClosed = true;
+    try {
+      await transport.close();
+    } catch (error) {
+      // Ignore errors during close (connection already dead)
+      console.log("Transport closed silently");
+    }
+  };
 
-  // Handle the request (this processes both GET handshakes and POST messages)
-  // Note: We pass req.body explicitly for the POST case
-  await transport.handleRequest(req, res, req.body);
+  try {
+    await server.connect(transport);
 
-  // Clean up when the connection closes
-  req.on("close", async () => {
-    await transport.close();
-    // server.close() is not called here because the server instance is shared
-  });
+    // Handle Request
+    // We pass req.body explicitly, but default to safe empty object if undefined
+    await transport.handleRequest(req, res, req.body || {});
+  } catch (error) {
+    // Only log actual errors, not normal disconnects
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal MCP Error" });
+    }
+  }
+
+  // Cleanup on connection close
+  req.on("close", safeClose);
+  req.on("end", safeClose);
+  req.on("error", safeClose);
 });
 
 // 3. Start Listening
