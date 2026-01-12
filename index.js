@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { api } from "./api.js";
 import { SearchServicesSchema, ExplainDiscountSchema } from "./schemas.js";
 import express from "express";
+const app = express();
 const server = new McpServer({
   name: "harito-services-mcp",
   version: "1.0.0",
@@ -116,7 +117,7 @@ app.post("/mcp", async (req, res) => {
 
 // 4. Start Listening
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Harito MCP server is running on port ${PORT}`);
   console.log(`MCP Endpoint: http://localhost:${PORT}/mcp`);
 });
